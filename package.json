@@ -1,0 +1,29 @@
+{
+  "name": "turnstile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "copy-assets": "node scripts/copy-assets.js",
+    "build": "tsc -p tsconfig.json && npm run copy-assets",
+    "start": "node --env-file=.env --dns-result-order=ipv4first dist/src/main.js",
+    "serve": "node --env-file=.env --dns-result-order=ipv4first dist/src/serve.js",
+    "seed-fake": "node dist/test/manual/seed-fake-drain.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test 'dist/test/*.test.js'"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.0.0",
+    "gsap": "^3.15.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

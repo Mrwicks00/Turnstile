@@ -1,0 +1,17 @@
+[package]
+name = "turnstile-circuit"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+orchard.workspace = true
+halo2_gadgets.workspace = true
+halo2_proofs.workspace = true
+pasta_curves = "0.5"
+rand.workspace = true
+ff = "0.13"
+group = "0.13"
+blake2b_simd = "1"
+
+[dev-dependencies]

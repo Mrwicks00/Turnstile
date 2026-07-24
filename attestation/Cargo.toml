@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["circuit", "prover", "verifier"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Exact-pinned, not caret ranges: for security-critical crypto code, an unreviewed automatic
+# minor-version bump is itself a supply-chain risk. Any bump to these three is a reviewed
+# event, not a routine `cargo update`. Only the real zcash/orchard and zcash/halo2 crates are
+# trusted here - see SECURITY.md for why several suspiciously-adjacent crates on crates.io
+# (unrelated orgs, names matching this project's exact niche vocabulary) are deliberately not
+# used anywhere in this workspace.
+[workspace.dependencies]
+orchard = { version = "=0.15.3", features = ["unstable-voting-circuits"] }
+halo2_gadgets = "=0.5.0"
+halo2_proofs = "=0.3.4"
+pasta_curves = "0.5"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

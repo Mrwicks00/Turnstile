@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Turnstile — Ironwood Drain Monitor</title>
+
+<style>
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --vellum: #F5EFE1;
+  --slate: #16302C;
+  --teal-deep: #146B62;
+  --teal: #2F9C90;
+  --rust: #C1502E;
+  --pewter: #7C8A80;
+  --hairline: rgba(22, 48, 44, 0.16);
+  --surface: var(--vellum);
+  --ink-text: var(--slate);
+  --ink-text-muted: #52655F;
+  --accent-water: var(--teal-deep);
+  --accent-signature: var(--rust);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #0E2321;
+    --ink-text: #EDE3C8;
+    --ink-text-muted: #9FB0A9;
+    --accent-water: var(--teal);
+    --accent-signature: var(--rust);
+    --hairline: rgba(237, 227, 200, 0.14);
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #0E2321;
+  --ink-text: #EDE3C8;
+  --ink-text-muted: #9FB0A9;
+  --accent-water: var(--teal);
+  --accent-signature: var(--rust);
+  --hairline: rgba(237, 227, 200, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink-text);
+  font-family: "Inter", -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.mono { font-family: "Space Mono", ui-monospace, monospace; }
+
+/* ---- Masthead ---- */
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 3.5rem;
+}
+.masthead__mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--accent-water);
+}
+.masthead__text {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+.masthead__text b { color: var(--ink-text); font-weight: 700; }
+
+/* ---- Hero / gauge ---- */
+.hero { text-align: center; margin-bottom: 3.5rem; }
+.gauge-wrap { position: relative; width: min(280px, 70vw); margin: 0 auto; }
+.gauge-wrap svg { width: 100%; height: auto; display: block; }
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.residual-figure {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  color: var(--accent-signature);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.residual-unit {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+.hero__caption {
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--ink-text-muted);
+  max-width: 46ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---- Ledger stats ---- */
+.ledger { border-top: 1px solid var(--hairline); margin-bottom: 3rem; }
+.ledger__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.ledger__label {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+.ledger__value {
+  font-family: "Space Mono", monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- Chart ---- */
+.chart-section { margin-bottom: 3.5rem; }
+.section-title {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+  margin-bottom: 1rem;
+}
+.chart-svg-wrap { position: relative; }
+.chart-svg-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart-line { fill: none; stroke: var(--accent-water); stroke-width: 2; }
+.chart-area { fill: var(--accent-water); opacity: 0.14; }
+.chart-axis-label { font-family: "Space Mono", monospace; font-size: 0.62rem; fill: var(--ink-text-muted); }
+.chart-crosshair { stroke: var(--ink-text-muted); stroke-width: 1; stroke-dasharray: 2 2; opacity: 0; pointer-events: none; }
+.chart-hover-dot { fill: var(--accent-signature); opacity: 0; pointer-events: none; }
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.4rem 0.6rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  opacity: 0;
+  transform: translate(-50%, -120%);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+/* ---- Audit log ---- */
+.audit-log { list-style: none; margin: 0; padding: 0; }
+.audit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.85rem;
+}
+.audit-row__height {
+  font-family: "Space Mono", monospace;
+  color: var(--ink-text-muted);
+  flex-shrink: 0;
+  width: 6.5em;
+}
+.audit-row__name { flex: 1; color: var(--ink-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-stamp {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.15em 0.5em;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.audit-stamp--pass { color: var(--teal-deep); border: 1px solid var(--teal-deep); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .audit-stamp--pass { color: var(--teal); border-color: var(--teal); }
+}
+:root[data-theme="dark"] .audit-stamp--pass { color: var(--teal); border-color: var(--teal); }
+.audit-stamp--fail { color: var(--accent-signature); border: 1px solid var(--accent-signature); }
+
+.message { text-align: center; padding: 3rem 1rem; color: var(--ink-text-muted); }
+.message--error { color: var(--accent-signature); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <svg class="masthead__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="14" r="10.5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M14 4 L14 14 L21 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="masthead__text"><b>Turnstile</b> — Ironwood (NU6.3) drain monitor</div>
+  </div>
+
+  <div id="content">
+    <div class="message">Loading…</div>
+  </div>
+</div>
+
+<script src="/gsap.min.js"></script>
+<script>
+const fmtZec = (zat) => (zat / 1e8).toLocaleString(undefined, { maximumFractionDigits: 8, minimumFractionDigits: 2 });
+const fmtRate = (rate) => {
+  if (!rate) return "insufficient data";
+  return `${(rate.zatPerDay / 1e8).toLocaleString(undefined, { maximumFractionDigits: 6 })} ZEC/day`;
+};
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const CHECK_LABELS = {
+  orchard_balance_nonnegative: "orchard_balance ≥ 0",
+  orchard_tx_nonnegative: "valueBalanceOrchard ≥ 0",
+};
+
+function buildGaugeSvg(fraction) {
+  const r = 90, cx = 100, cy = 100;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  return `
+    <svg viewBox="0 0 200 200">
+      <circle cx="${cx}" cy="${cy}" r="${r + 14}" fill="none" stroke="var(--pewter)" stroke-width="2"
+        stroke-dasharray="3 5" opacity="0.55"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--hairline)" stroke-width="10"/>
+      <circle id="gauge-arc" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--accent-water)"
+        stroke-width="10" stroke-linecap="round"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}"
+        transform="rotate(-90 ${cx} ${cy})" data-target-offset="${circumference * (1 - clamped)}"/>
+    </svg>`;
+}
+
+function buildChartSvg(series) {
+  const w = 640, h = 220, padL = 46, padR = 8, padT = 10, padB = 22;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const heights = series.map((p) => p.height);
+  const balances = series.map((p) => p.orchard_balance / 1e8);
+  const minH = Math.min(...heights), maxH = Math.max(...heights);
+  const minB = Math.min(0, ...balances), maxB = Math.max(...balances, minB + 1e-8);
+  const x = (hh) => padL + (maxH === minH ? 0 : ((hh - minH) / (maxH - minH)) * plotW);
+  const y = (b) => padT + plotH - ((b - minB) / (maxB - minB)) * plotH;
+
+  const linePoints = series.map((p) => `${x(p.height)},${y(p.orchard_balance / 1e8)}`).join(" L ");
+  const areaPath = `M ${x(series[0].height)},${y(0)} L ${linePoints.replace(/^/, "")} L ${x(series[series.length-1].height)},${y(0)} Z`;
+  const linePath = `M ${linePoints}`;
+
+  return {
+    svg: `
+      <svg viewBox="0 0 ${w} ${h}" id="chart-svg">
+        <text class="chart-axis-label" x="${padL}" y="${padT + 4}" text-anchor="start">${maxB.toFixed(4)}</text>
+        <text class="chart-axis-label" x="${padL}" y="${padT + plotH}" text-anchor="start">${minB.toFixed(4)}</text>
+        <text class="chart-axis-label" x="${padL}" y="${h - 4}" text-anchor="start">${minH}</text>
+        <text class="chart-axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${maxH}</text>
+        <path class="chart-area" d="${areaPath}"/>
+        <path class="chart-line" id="chart-line-path" d="${linePath}"/>
+        <line class="chart-crosshair" id="chart-crosshair" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}"/>
+        <circle class="chart-hover-dot" id="chart-hover-dot" r="4"/>
+        <rect id="chart-hover-target" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="transparent"/>
+      </svg>`,
+    meta: { padL, plotW, minH, maxH, x, y, series },
+  };
+}
+
+function wireChartHover(container, meta) {
+  const svg = container.querySelector("#chart-svg");
+  const target = container.querySelector("#chart-hover-target");
+  const crosshair = container.querySelector("#chart-crosshair");
+  const dot = container.querySelector("#chart-hover-dot");
+  const tooltip = container.querySelector(".chart-tooltip");
+
+  target.addEventListener("mousemove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const svgX = ((e.clientX - rect.left) / rect.width) * 640;
+    const frac = Math.max(0, Math.min(1, (svgX - meta.padL) / meta.plotW));
+    const targetHeight = meta.minH + frac * (meta.maxH - meta.minH);
+    let nearest = meta.series[0];
+    for (const p of meta.series) {
+      if (Math.abs(p.height - targetHeight) < Math.abs(nearest.height - targetHeight)) nearest = p;
+    }
+    const px = meta.x(nearest.height), py = meta.y(nearest.orchard_balance / 1e8);
+    crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px); crosshair.style.opacity = 1;
+    dot.setAttribute("cx", px); dot.setAttribute("cy", py); dot.style.opacity = 1;
+
+    const pct = px / 640;
+    tooltip.style.left = `${pct * 100}%`;
+    tooltip.style.top = `${(py / 220) * 100}%`;
+    tooltip.style.opacity = 1;
+    tooltip.innerHTML = `height ${nearest.height}<br>${fmtZec(nearest.orchard_balance)} ZEC`;
+  });
+  target.addEventListener("mouseleave", () => {
+    crosshair.style.opacity = 0; dot.style.opacity = 0; tooltip.style.opacity = 0;
+  });
+}
+
+function renderAuditLog(checks) {
+  if (checks.length === 0) return `<div class="message">No checks recorded yet.</div>`;
+  return `<ul class="audit-log">${checks.map((c) => `
+    <li class="audit-row">
+      <span class="audit-row__height mono">${c.height}</span>
+      <span class="audit-row__name">${escapeHtml(CHECK_LABELS[c.check_name] || c.check_name)}${c.txid ? ` <span style="opacity:.6">(${escapeHtml(c.txid.slice(0,10))}…)</span>` : ""}</span>
+      <span class="audit-stamp audit-stamp--${c.status === "pass" ? "pass" : "fail"}">${c.status === "pass" ? "PASS" : "FAIL"}</span>
+    </li>`).join("")}</ul>`;
+}
+
+async function main() {
+  const content = document.getElementById("content");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let drain, checksResp;
+  try {
+    const [drainRes, checksRes] = await Promise.all([fetch("/api/drain"), fetch("/api/checks?limit=25")]);
+    if (!drainRes.ok) throw new Error(`HTTP ${drainRes.status}`);
+    drain = await drainRes.json();
+    checksResp = checksRes.ok ? await checksRes.json() : { checks: [] };
+  } catch (err) {
+    content.innerHTML = `<div class="message message--error">Failed to load drain data: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+
+  if (!drain.seeded) {
+    content.innerHTML = `<div class="message">${escapeHtml(drain.message)}</div>`;
+    return;
+  }
+
+  const fraction = drain.seedBalance > 0 ? drain.residual / drain.seedBalance : 0;
+  const chart = buildChartSvg(drain.series);
+
+  content.innerHTML = `
+    <div class="hero">
+      <div class="gauge-wrap">
+        ${buildGaugeSvg(fraction)}
+        <div class="gauge-center">
+          <div class="residual-figure mono" id="residual-figure">0</div>
+          <div class="residual-unit">ZEC residual</div>
+        </div>
+      </div>
+      <p class="hero__caption">Value remaining in the sealed Orchard pool since Ironwood activation at height ${drain.activationHeight.toLocaleString()}.</p>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger__row"><span class="ledger__label">Since activation</span><span class="ledger__value mono">${fmtRate(drain.rate.sinceSeed)}</span></div>
+      <div class="ledger__row"><span class="ledger__label">Recent${drain.rate.windowed ? ` (${drain.rate.windowed.windowBlocks} blk)` : ""}</span><span class="ledger__value mono">${fmtRate(drain.rate.windowed)}</span></div>
+      <div class="ledger__row"><span class="ledger__label">Total drained</span><span class="ledger__value mono">${fmtZec(drain.drainedTotal)} ZEC</span></div>
+      <div class="ledger__row"><span class="ledger__label">Latest indexed height</span><span class="ledger__value mono">${drain.latestIndexedHeight.toLocaleString()}</span></div>
+    </div>
+
+    <div class="chart-section">
+      <div class="section-title">Orchard balance — activation to tip</div>
+      <div class="chart-svg-wrap" id="chart-container">
+        ${chart.svg}
+        <div class="chart-tooltip"></div>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <div class="section-title">Audit log — invariant checks, most recent first</div>
+      ${renderAuditLog(checksResp.checks || [])}
+    </div>
+  `;
+
+  wireChartHover(document.getElementById("chart-container"), chart.meta);
+
+  if (reduceMotion) {
+    document.getElementById("residual-figure").textContent = fmtZec(drain.residual);
+    document.getElementById("gauge-arc").style.strokeDashoffset =
+      document.getElementById("gauge-arc").getAttribute("data-target-offset");
+    return;
+  }
+
+  const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
+  const arc = document.getElementById("gauge-arc");
+  tl.to(arc, { strokeDashoffset: arc.dataset.targetOffset, duration: 1.4, ease: "power3.inOut" }, 0);
+
+  const counter = { v: 0 };
+  tl.to(counter, {
+    v: drain.residual, duration: 1.4, ease: "power3.inOut",
+    onUpdate: () => { document.getElementById("residual-figure").textContent = fmtZec(Math.round(counter.v)); },
+  }, 0);
+
+  tl.from(".hero__caption", { autoAlpha: 0, y: 8, duration: 0.5 }, 0.9);
+  tl.from(".ledger__row", { autoAlpha: 0, x: -12, duration: 0.4, stagger: 0.08 }, 1.0);
+
+  const linePath = document.getElementById("chart-line-path");
+  const len = linePath.getTotalLength();
+  gsap.set(linePath, { strokeDasharray: len, strokeDashoffset: len });
+  tl.to(linePath, { strokeDashoffset: 0, duration: 1.2, ease: "power2.inOut" }, 1.2);
+  tl.from(".chart-area", { autoAlpha: 0, duration: 0.8 }, 1.6);
+  tl.from(".audit-row", { autoAlpha: 0, y: 6, duration: 0.35, stagger: 0.04 }, 1.9);
+}
+
+main();
+setInterval(main, 30000);
+</script>
+</body>
+</html>

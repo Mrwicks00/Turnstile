@@ -1,0 +1,18 @@
+[package]
+name = "turnstile-verifier"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "turnstile-verifier"
+path = "src/main.rs"
+
+[dependencies]
+turnstile-circuit = { path = "../circuit" }
+serde.workspace = true
+serde_json.workspace = true
+
+# This crate must NEVER gain a dependency capable of deriving or handling Orchard spending
+# key material - that boundary is enforced by review of this file, not just convention.
+# See attestation/SECURITY.md and the project plan's "trust boundary" section.
