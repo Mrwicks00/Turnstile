@@ -241,8 +241,12 @@ document.getElementById("btn-send").addEventListener("click", async () => {
     const summary = await wallet.get_wallet_summary();
     const balanceEntry = findAccountBalance(summary.account_balances, accountId);
     const zats = spendableZats(balanceEntry);
-    // propose_transfer's `value` param is typed bigint in the .d.ts; leave headroom for the fee.
-    const sendAmount = BigInt(Math.max(zats - 10000, 0));
+    // Real ZIP-317 fees can exceed a small guessed buffer (propose_transfer failed with
+    // "possibly insufficient balance" trying to send balance-minus-10000zats) - send at
+    // most half the balance (capped at 1 ZEC) instead of nearly everything, leaving real
+    // margin for whatever the actual fee turns out to be.
+    const sendAmount = BigInt(Math.min(Math.floor(zats / 2), 100000000));
+    log(`sending ${Number(sendAmount) / 1e8} ZEC of ${zats / 1e8} ZEC balance (leaving margin for fees)`);
 
     const proposal = await wallet.propose_transfer(accountId, destAddress, sendAmount);
     log("proposal created");
