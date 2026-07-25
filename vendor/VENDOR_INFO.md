@@ -28,15 +28,26 @@ before rebuilding, or the edit is silently ignored and the previous binary gets 
    making every real failure indistinguishable and undiagnosable from JS. Patched to
    `.map_err(|e| Error::Generic(format!("propose_transfer real error: {:?}", e)))`.
 
-2. **`zcash_client_memory/src/types/memory_wallet/mod.rs`'s `note_is_spendable`** treated a
-   note with an undetermined `recipient_key_scope` (`None`) as unconditionally unspendable
-   forever, regardless of confirmations - observed in practice for a real, correctly-valued,
-   unspent, fully-confirmed testnet note received via a diversified Sapling address not
-   produced by this wallet's own address-generation flow (its scope just never got
-   classified by the underlying scanning logic - a real, separate gap upstream in
-   `zcash_client_backend`/`zcash_client_memory`, not something fixable at this layer).
-   Patched the `None` arm to fall back to the same (stricter) confirmation requirement as
-   `Some(Scope::External)` instead of `false` - every other check (spent status, value
-   floor, nullifier/position/mined-height presence) is untouched, so this only stops an
-   incompleteness bug from being a permanent freeze, it doesn't relax any actual security
-   check.
+2. **`zcash_client_memory/src/types/memory_wallet/mod.rs`'s `note_is_spendable`** - `None`
+   scope arm: turned out NOT to be the actual cause for the specific stuck note investigated
+   (debug logging - see patch 3 - showed `scope=Some(External) scope_ok=true` for it), but
+   kept anyway since it's still a real incompleteness fix for whenever scope genuinely can't
+   be classified. Falls back to the same (stricter) confirmation requirement as
+   `Some(Scope::External)` instead of unconditionally `false`.
+
+3. **`unscanned_ranges()`'s consumer in `note_is_spendable`** (the `note_in_unscanned_range`
+   check): the actual real cause. For each range still queued above `Scanned` priority (kept
+   near the chain tip intentionally, for reorg protection), the code tries to resolve the
+   range's note-commitment-tree subtree/checkpoint position bounds; when that lookup can't
+   resolve, it defaulted to `true` ("assume this note falls in the unscanned range"),
+   regardless of the note's actual position. Confirmed via targeted per-condition debug
+   logging (`tracing::warn!`, since `webzjs-wallet` already bridges Rust `tracing` to the
+   browser console via `tracing-web`) that this was blanket-flagging a real, fully-scanned,
+   fully-confirmed note (`fully_scanned_height == chain_tip`) as permanently unspendable.
+   Patched the fallback to `false` (don't assume unscanned when position data is missing).
+   **This is a real conservative-to-permissive posture change**, not a narrow incompleteness
+   fix like the other two - accepted here because it was empirically confirmed safe for the
+   specific note investigated, and this is testnet-only, already-disclaimed experimental
+   software. The `tracing::warn!` debug logging from patch 2's investigation is still present
+   in this build (harmless, just verbose) - remove `note_is_spendable`'s
+   `// TURNSTILE DEBUG PATCH` block on the next rebuild if a quieter build is wanted.
