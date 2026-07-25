@@ -1,9 +1,9 @@
 #!/bin/sh
-# Railway runs one service = one container = one foreground process. This project is two
-# cooperating processes (indexer writes, server reads) sharing one SQLite file on a mounted
-# volume - so we background a self-restarting indexer loop and exec the server as the
-# foreground process, matching the resilience we've been doing manually in dev (the indexer
-# has genuinely crashed on transient network blips before and needs auto-restart).
+# Railway runs one service = one container = one foreground process. This project is three
+# cooperating processes (indexer writes, server reads, Traefik proxies gRPC-web for the
+# migration assistant) sharing one container - Railway's free plan doesn't allow a second
+# service, so the gRPC-web proxy runs here instead of as its own service (see
+# src/server.ts's internal-proxy middleware, which forwards to it on 127.0.0.1:8081).
 set -e
 
 (
@@ -13,6 +13,14 @@ set -e
     # without this the restart loop would only ever run once, defeating its own purpose.
     node dist/src/main.js || true
     echo "[railway-start] indexer exited, restarting in 5s..." >&2
+    sleep 5
+  done
+) &
+
+(
+  while true; do
+    ./bin/traefik --configFile=proxy/traefik.yml || true
+    echo "[railway-start] traefik exited, restarting in 5s..." >&2
     sleep 5
   done
 ) &

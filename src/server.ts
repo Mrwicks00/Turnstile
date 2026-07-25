@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import http from "node:http";
 import type { DatabaseSync } from "node:sqlite";
 import type { Config, ApiConfig, AttestationConfig } from "./config.js";
 import {
@@ -27,6 +28,27 @@ export function buildApp(
   verify: VerifyFn,
 ): Express {
   const app = express();
+
+  // Forwards the migration assistant's gRPC-web calls to the Traefik instance running
+  // internally on 127.0.0.1:8081 (see scripts/railway-start.sh) - Railway's free plan
+  // doesn't allow a second service, so this proxies in-process instead of Traefik having
+  // its own public domain. Mounted before express.json() so the binary grpc-web request
+  // body is piped through raw, untouched by body parsing.
+  app.use("/grpc-proxy", (req: Request, res: Response) => {
+    const target = http.request(
+      { hostname: "127.0.0.1", port: 8081, path: req.url, method: req.method, headers: req.headers },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      },
+    );
+    target.on("error", (err) => {
+      logger.error("grpc-proxy forwarding error", { error: err.message });
+      if (!res.headersSent) res.status(502).end();
+    });
+    req.pipe(target);
+  });
+
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/api/pool-balance", (req: Request, res: Response) => {

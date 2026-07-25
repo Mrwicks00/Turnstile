@@ -3,7 +3,10 @@
 // Nothing is persisted anywhere (no localStorage, no cookies, no server) - a refresh always
 // loses the in-memory wallet; "Import" is the only way back in, using a saved seed phrase.
 
-const PROXY_URL = window.__TURNSTILE_GRPC_PROXY_URL__ || "http://localhost:1234/testnet";
+// Same-origin path, forwarded server-side to an internal Traefik gRPC-web proxy
+// (see src/server.ts's /grpc-proxy middleware) - avoids needing a separate public
+// domain, which Railway's free plan doesn't allow for a second service.
+const PROXY_URL = window.__TURNSTILE_GRPC_PROXY_URL__ || `${window.location.origin}/grpc-proxy/testnet`;
 const FAUCET_URL = "https://fauzec.com/";
 
 let wasmReady = null;
