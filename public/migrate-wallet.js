@@ -14,7 +14,11 @@ let wallet = null;
 let accountId = null;
 let seedPhrase = null;
 let currentTip = null;
-let lastKnownZats = 0;
+
+function setStep(id, state) {
+  const el = document.getElementById(id);
+  if (el) el.dataset.state = state;
+}
 
 // WalletSummary.account_balances serializes (via serde_wasm_bindgen, see WebZjs's
 // crates/webzjs-wallet/src/bindgen/wallet.rs) as an array of [accountId, AccountBalance]
@@ -44,6 +48,23 @@ function log(msg) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function truncateMiddle(s, head = 14, tail = 10) {
+  return s.length <= head + tail + 3 ? s : `${s.slice(0, head)}…${s.slice(-tail)}`;
+}
+
+// Renders a truncated value with a working copy button - nobody needs 200 raw characters
+// of a unified address inline; the full value is still one click away.
+function copyChip(containerId, value, label) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = `
+    <p class="field__hint" style="margin-bottom:0.3rem;">${label}</p>
+    <div class="addr-chip">
+      <span class="addr-chip__text mono" title="${escapeHtml(value)}">${escapeHtml(truncateMiddle(value))}</span>
+      <button class="copy-btn" type="button">Copy</button>
+    </div>`;
+  container.querySelector(".copy-btn").addEventListener("click", () => navigator.clipboard.writeText(value));
 }
 
 // The ChainSpec/BlockID messages used here are tiny, so a hand-rolled varint decoder for
@@ -140,24 +161,22 @@ async function activateWallet(seed, birthdayHeight, { showSeed }) {
   if (showSeed) {
     document.getElementById("wallet-seed").innerHTML = `
       <div class="seed-box mono">
-        <strong>Your testnet seed phrase (shown once — save it now if you want it):</strong><br>
+        <span class="seed-box__label">Your testnet seed phrase — shown once, save it now</span>
         ${escapeHtml(seedPhrase)}
-        <div><button class="copy-btn" id="btn-copy-seed">Copy</button></div>
+        <div><button class="copy-btn" id="btn-copy-seed" type="button">Copy</button></div>
       </div>`;
     document.getElementById("btn-copy-seed").addEventListener("click", () => {
       navigator.clipboard.writeText(seedPhrase);
     });
   }
 
-  document.getElementById("wallet-address").innerHTML = `
-    <div class="address-box mono">
-      Your testnet address:<br>${escapeHtml(address)}
-    </div>
-    <p class="status__note">Fund it at <a href="${FAUCET_URL}" target="_blank" rel="noopener">${FAUCET_URL}</a>,
-    then come back and check your balance.</p>`;
+  copyChip("wallet-address", address, `Fund this address at <a href="${FAUCET_URL}" target="_blank" rel="noopener">${FAUCET_URL}</a>, then check your balance below.`);
 
-  document.getElementById("wallet-actions-sync").style.display = "flex";
-  document.getElementById("import-form").style.display = "none";
+  document.getElementById("wallet-actions-sync").hidden = false;
+  document.getElementById("import-form").hidden = true;
+  setStep("step-create", "done");
+  setStep("step-fund", "active");
+  setStep("step-balance", "active");
   log("account created, id=" + accountId + ", birthday=" + effectiveBirthday);
 }
 
@@ -177,7 +196,7 @@ document.getElementById("btn-generate").addEventListener("click", async () => {
 
 document.getElementById("btn-show-import").addEventListener("click", () => {
   const form = document.getElementById("import-form");
-  form.style.display = form.style.display === "none" ? "block" : "none";
+  form.hidden = !form.hidden;
 });
 
 document.getElementById("btn-import").addEventListener("click", async () => {
@@ -217,21 +236,23 @@ document.getElementById("btn-sync").addEventListener("click", async () => {
     const balanceEntry = summary ? findAccountBalance(summary.account_balances, accountId) : null;
     const zats = spendableZats(balanceEntry);
     const zec = zats / 1e8;
-    lastKnownZats = zats;
 
     document.getElementById("wallet-balance").innerHTML = `
-      <div class="status" style="margin-top:1rem;">
-        <div class="status__row"><span class="status__label">Balance</span><span class="status__value">${zec.toLocaleString(undefined, { maximumFractionDigits: 8 })} TAZ</span></div>
+      <div class="balance-hero">
+        <span class="balance-hero__figure mono">${zec.toLocaleString(undefined, { maximumFractionDigits: 8 })}</span>
+        <span class="balance-hero__unit">TAZ</span>
       </div>`;
 
     if (zec > 0) {
-      document.getElementById("wallet-actions-send").style.display = "flex";
+      document.getElementById("wallet-actions-send").hidden = false;
       const amountInput = document.getElementById("send-amount");
       const suggested = Math.min(zats / 2, 100000000) / 1e8; // default to half balance, capped at 1 ZEC
       amountInput.value = suggested.toFixed(8);
       amountInput.max = String(zec);
       document.getElementById("send-amount-hint").textContent =
         `Balance is ${zec.toLocaleString(undefined, { maximumFractionDigits: 8 })} TAZ - leave some unspent to cover the network fee.`;
+      setStep("step-balance", "done");
+      setStep("step-send", "active");
     }
     log("sync complete, balance=" + zec + " TAZ (" + describeBalance(balanceEntry) + ")");
     log("wallet summary: chain_tip=" + summary.chain_tip_height + " fully_scanned=" + summary.fully_scanned_height + " accounts=" + JSON.stringify(summary.account_balances.map(([id]) => id)));
@@ -274,9 +295,15 @@ document.getElementById("btn-send").addEventListener("click", async () => {
 
     const txidHex = Array.from(txids.slice(0, 32)).map((b) => b.toString(16).padStart(2, "0")).join("");
     document.getElementById("wallet-result").innerHTML = `
-      <div class="status" style="margin-top:1rem;">
-        <div class="status__row"><span class="status__label">Real txid</span><span class="status__value mono" style="word-break:break-all;">${escapeHtml(txidHex)}</span></div>
+      <div class="field" style="margin-top:1rem;">
+        <label>Real txid</label>
+        <div class="addr-chip">
+          <span class="addr-chip__text mono">${escapeHtml(truncateMiddle(txidHex, 12, 10))}</span>
+          <button class="copy-btn" type="button" id="btn-copy-txid">Copy</button>
+        </div>
       </div>`;
+    document.getElementById("btn-copy-txid").addEventListener("click", () => navigator.clipboard.writeText(txidHex));
+    setStep("step-send", "done");
     setBusy("btn-send", false, "Send test migration");
   } catch (err) {
     log("ERROR: " + (err && err.message ? err.message : String(err)));

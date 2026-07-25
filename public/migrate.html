@@ -272,14 +272,60 @@ body {
   color: var(--accent-signature);
 }
 
-/* ---- Try-it-yourself wallet ---- */
-.wallet-box {
+/* ---- Try-it-yourself wallet: a card of sequential steps ---- */
+.wallet-card {
   border: 1px solid var(--hairline);
-  border-radius: 4px;
-  padding: 1.1rem 1.2rem;
+  border-radius: 6px;
+  padding: 0.25rem 1.25rem;
   margin-top: 1.5rem;
 }
-.wallet-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+.wallet-steps { list-style: none; margin: 0; padding: 0; }
+.wallet-step {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--hairline);
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+.wallet-step:last-child { border-bottom: none; }
+.wallet-step[data-state="active"],
+.wallet-step[data-state="done"] { opacity: 1; }
+.wallet-step__head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0; }
+.wallet-step__num {
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--pewter);
+  color: var(--pewter);
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.wallet-step[data-state="active"] .wallet-step__num {
+  border-color: var(--accent-water);
+  color: var(--accent-water);
+}
+.wallet-step[data-state="done"] .wallet-step__num {
+  border-color: var(--teal-deep);
+  background: var(--teal-deep);
+  color: var(--vellum);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .wallet-step[data-state="done"] .wallet-step__num { background: var(--teal); border-color: var(--teal); color: var(--slate); }
+}
+:root[data-theme="dark"] .wallet-step[data-state="done"] .wallet-step__num { background: var(--teal); border-color: var(--teal); color: var(--slate); }
+.wallet-step__title {
+  font-family: "Space Mono", monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.wallet-step__body { margin-top: 0.9rem; margin-left: 2.65rem; }
+
+.wallet-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .wallet-btn {
   font-family: "Space Mono", monospace;
   font-size: 0.82rem;
@@ -297,6 +343,38 @@ body {
 .wallet-btn:hover { opacity: 0.88; }
 .wallet-btn:active { transform: scale(0.98); }
 .wallet-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wallet-btn--ghost {
+  background: transparent;
+  color: var(--accent-water);
+  border: 1px solid var(--accent-water);
+}
+
+.field { margin-top: 1rem; }
+.field:first-child { margin-top: 0; }
+.field label {
+  display: block;
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+  margin-bottom: 0.4rem;
+}
+.field input, .field textarea {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.65rem 0.75rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink-text);
+}
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--accent-water); }
+.field__hint { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--ink-text-muted); }
+
+.import-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--hairline); }
+
 .seed-box {
   border: 1px solid var(--accent-signature);
   border-radius: 4px;
@@ -306,12 +384,35 @@ body {
   word-break: break-word;
   color: var(--ink-text);
 }
-.wallet-log {
-  margin-top: 1rem;
+.seed-box__label {
+  display: block;
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-signature);
+  margin-bottom: 0.5rem;
+}
+
+/* Truncated address chip: nobody needs to read 200 raw characters inline */
+.addr-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.7rem 0.9rem;
+  margin-top: 0.75rem;
+}
+.addr-chip__text {
+  font-family: "Space Mono", monospace;
   font-size: 0.82rem;
   color: var(--ink-text-muted);
-  white-space: pre-wrap;
-  word-break: break-word;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .copy-btn {
   font-family: "Space Mono", monospace;
@@ -322,9 +423,58 @@ body {
   background: none;
   border: 1px solid var(--accent-water);
   border-radius: 3px;
-  padding: 0.3em 0.6em;
+  padding: 0.4em 0.7em;
   cursor: pointer;
-  margin-top: 0.5rem;
+  flex-shrink: 0;
+}
+.copy-btn:active { transform: scale(0.96); }
+
+/* Balance gets a hero moment, same visual register as the residual figure elsewhere */
+.balance-hero { text-align: left; margin-top: 0.25rem; }
+.balance-hero__figure {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 6vw, 2.1rem);
+  color: var(--accent-signature);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.balance-hero__unit {
+  margin-left: 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+
+/* Technical log: available, not dominant */
+.wallet-log-details {
+  margin: 1rem 1.25rem 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+.wallet-log-details summary {
+  cursor: pointer;
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+  list-style: none;
+}
+.wallet-log-details summary::-webkit-details-marker { display: none; }
+.wallet-log-details summary::before { content: "▸ "; }
+.wallet-log-details[open] summary::before { content: "▾ "; }
+.wallet-log {
+  margin-top: 0.75rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--ink-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 16rem;
+  overflow-y: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -413,39 +563,80 @@ body {
       in a real seed phrase, or one protecting real funds, on this or any page.</strong>
     </div>
 
-    <div class="wallet-box" id="wallet-box">
-      <div class="wallet-actions">
-        <button class="wallet-btn" id="btn-generate">Generate testnet wallet</button>
-        <button class="wallet-btn" id="btn-show-import" style="background:transparent;color:var(--accent-water);border:1px solid var(--accent-water);">Import existing seed phrase</button>
-      </div>
-      <div id="import-form" style="display:none; margin-top:1rem;">
-        <div class="form-row">
-          <label for="import-seed" style="display:block; font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-text-muted); margin-bottom:0.4rem;">Seed phrase (24 words)</label>
-          <textarea id="import-seed" rows="2" style="width:100%; background:transparent; border:1px solid var(--hairline); border-radius:3px; padding:0.65rem 0.75rem; font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--ink-text);"></textarea>
-        </div>
-        <div class="form-row" style="margin-top:0.75rem;">
-          <label for="import-birthday" style="display:block; font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-text-muted); margin-bottom:0.4rem;">Birthday height (block height when you first generated this wallet — leave blank if unsure)</label>
-          <input type="number" id="import-birthday" placeholder="e.g. 4200352" style="width:100%; background:transparent; border:1px solid var(--hairline); border-radius:3px; padding:0.65rem 0.75rem; font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--ink-text);" />
-          <p class="status__note">If your funds were received before this height, sync won't find them — when in doubt, use a lower number. Leaving this blank scans from a recent default, not from genesis.</p>
-        </div>
-        <div class="wallet-actions">
-          <button class="wallet-btn" id="btn-import">Import wallet</button>
-        </div>
-      </div>
-      <div id="wallet-seed"></div>
-      <div id="wallet-address"></div>
-      <div class="wallet-actions" id="wallet-actions-sync" style="display:none;">
-        <button class="wallet-btn" id="btn-sync">Check balance</button>
-      </div>
-      <div id="wallet-balance"></div>
-      <div class="wallet-actions" id="wallet-actions-send" style="display:none; flex-direction:column; align-items:flex-start; gap:0.5rem;">
-        <label for="send-amount" style="display:block; font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-text-muted);">Amount to send (ZEC)</label>
-        <input type="number" id="send-amount" step="0.00000001" min="0" style="width:100%; max-width:16rem; background:transparent; border:1px solid var(--hairline); border-radius:3px; padding:0.6rem 0.75rem; font-family:'Space Mono',monospace; font-size:0.88rem; color:var(--ink-text);" />
-        <p class="status__note" id="send-amount-hint" style="margin-top:0;">Leave some balance unspent to cover the network fee.</p>
-        <button class="wallet-btn" id="btn-send">Send test migration</button>
-      </div>
-      <div id="wallet-result"></div>
-      <div class="wallet-log" id="wallet-log"></div>
+    <div class="wallet-card" id="wallet-box">
+      <ol class="wallet-steps">
+        <li class="wallet-step" id="step-create" data-state="active">
+          <div class="wallet-step__head">
+            <span class="wallet-step__num">1</span>
+            <span class="wallet-step__title">Create your wallet</span>
+          </div>
+          <div class="wallet-step__body">
+            <div class="wallet-actions">
+              <button class="wallet-btn" id="btn-generate">Generate testnet wallet</button>
+              <button class="wallet-btn wallet-btn--ghost" id="btn-show-import">Import existing seed phrase</button>
+            </div>
+            <div id="import-form" class="import-form" hidden>
+              <div class="field">
+                <label for="import-seed">Seed phrase (24 words)</label>
+                <textarea id="import-seed" rows="2"></textarea>
+              </div>
+              <div class="field">
+                <label for="import-birthday">Birthday height (leave blank if unsure)</label>
+                <input type="number" id="import-birthday" placeholder="e.g. 4200352" />
+                <p class="field__hint">If your funds were received before this height, sync won't find them — when in doubt, use a lower number. Blank scans from a recent default, not genesis.</p>
+              </div>
+              <div class="wallet-actions" style="margin-top: 1rem;">
+                <button class="wallet-btn" id="btn-import">Import wallet</button>
+              </div>
+            </div>
+            <div id="wallet-seed"></div>
+          </div>
+        </li>
+
+        <li class="wallet-step" id="step-fund" data-state="pending">
+          <div class="wallet-step__head">
+            <span class="wallet-step__num">2</span>
+            <span class="wallet-step__title">Fund it</span>
+          </div>
+          <div class="wallet-step__body" id="wallet-address"></div>
+        </li>
+
+        <li class="wallet-step" id="step-balance" data-state="pending">
+          <div class="wallet-step__head">
+            <span class="wallet-step__num">3</span>
+            <span class="wallet-step__title">Check balance</span>
+          </div>
+          <div class="wallet-step__body">
+            <div class="wallet-actions" id="wallet-actions-sync" hidden>
+              <button class="wallet-btn" id="btn-sync">Check balance</button>
+            </div>
+            <div id="wallet-balance"></div>
+          </div>
+        </li>
+
+        <li class="wallet-step" id="step-send" data-state="pending">
+          <div class="wallet-step__head">
+            <span class="wallet-step__num">4</span>
+            <span class="wallet-step__title">Send test migration</span>
+          </div>
+          <div class="wallet-step__body">
+            <div class="wallet-actions" id="wallet-actions-send" hidden style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+              <div class="field" style="width:100%; max-width:16rem;">
+                <label for="send-amount">Amount to send (ZEC)</label>
+                <input type="number" id="send-amount" step="0.00000001" min="0" />
+                <p class="field__hint" id="send-amount-hint">Leave some balance unspent to cover the network fee.</p>
+              </div>
+              <button class="wallet-btn" id="btn-send">Send test migration</button>
+            </div>
+            <div id="wallet-result"></div>
+          </div>
+        </li>
+      </ol>
+
+      <details class="wallet-log-details">
+        <summary>Technical log</summary>
+        <div class="wallet-log" id="wallet-log"></div>
+      </details>
     </div>
   </div>
 
@@ -482,7 +673,8 @@ if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
   gsap.from(".page-title, .page-lede", { autoAlpha: 0, y: 10, duration: 0.5, stagger: 0.08 });
   gsap.from(".scope-banner", { autoAlpha: 0, y: 10, duration: 0.5, stagger: 0.1, delay: 0.15 });
   gsap.from(".step", { autoAlpha: 0, y: 10, duration: 0.4, stagger: 0.08, delay: 0.3 });
-  gsap.from(".wallet-box", { autoAlpha: 0, y: 10, duration: 0.4, delay: 0.6 });
+  gsap.from(".wallet-card", { autoAlpha: 0, y: 10, duration: 0.4, delay: 0.6 });
+  gsap.from(".wallet-step", { autoAlpha: 0, y: 8, duration: 0.35, stagger: 0.08, delay: 0.75 });
   gsap.from(".status__row", { autoAlpha: 0, x: -10, duration: 0.35, stagger: 0.06, delay: 0.8 });
 }
 </script>
