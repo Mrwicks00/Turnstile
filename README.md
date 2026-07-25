@@ -84,74 +84,79 @@ data.
 
 **Data sources:** [Tatum](https://tatum.io)'s hosted Zcash testnet RPC gateway (fully
 synced, authenticated tier), plus an independent local `zebrad` testnet node syncing in the
-background as a from-scratch, don't-trust-a-hosted-provider fallback — see [Phase 2's
-bottleneck](#phase-2--residual-attestation-in-progress) below for why the latter matters.
+background as a from-scratch, don't-trust-a-hosted-provider fallback — see the [superseded
+attestation approach](#superseded-approach-residual-attestation) below for why the latter
+matters: Tatum doesn't expose the `z_gettreestate` RPC needed for anchor-fetching on any of
+its plan tiers (confirmed by direct testing), so anything needing full nullifier history
+can only come from a self-run node with a complete sync.
 
 Full empirical findings on the RPC response shapes this is built on are in
 `TASK0_FINDINGS.md`.
 
-## Phase 2 — residual attestation (in progress)
+## Phase 2 — migration assistant (in progress)
 
-The dashboard's residual number is a **loose upper bound**, not proof of anything: it can't
-tell forgotten-forever funds apart from funds someone still holds the keys to and simply
-hasn't moved yet. Phase 2 lets holders voluntarily prove control of a note in the sealed
-pool — without spending it and without revealing which note — tightening that bound into
-`unattested_residual`.
+The dashboard's residual number is a **loose upper bound**: it can't tell forgotten-forever
+funds apart from funds someone still holds the keys to and simply hasn't moved yet. The
+first Phase 2 approach tried to tighten that bound by having holders *prove* control of a
+note without spending it (see [superseded approach](#superseded-approach-residual-attestation)
+below). On reflection, that's the wrong unlock — anyone who can prove ownership can already
+just move the funds instead, which is strictly more useful and closes the actual gap the
+dashboard measures. Phase 2 is now a **migration assistant**: a real tool for actually
+moving funds out of the sealed pool, not just attesting to them.
 
-This is genuine, security-critical zero-knowledge cryptography, built with a real
+**`/migrate.html`** is a real, client-side Zcash testnet wallet built on
+[ChainSafe's WebZjs](https://github.com/ChainSafe/WebZjs) — official Zcash Rust
+cryptography (`zcash_primitives`, `orchard`, `sapling-crypto`) compiled to WASM. It runs
+entirely in the browser: generate or import a 24-word seed phrase, sync, and perform a real
+shielded send — all client-side, with private key material never transmitted to this
+project's server. **WebZjs is itself unaudited** ("no reviews or audit, and come with no
+guarantees whatsoever," per its own docs) — scoped deliberately to testnet-only,
+freshly-generated wallets, never an imported real-funds seed.
+
+**Why this needed real infrastructure, not just a form:**
+- No npm package exists for WebZjs's wallet crate — it's built from source (Rust nightly,
+  `wasm-pack`, clang 17+, `just`) and vendored into `vendor/webzjs-wallet` /
+  `vendor/webzjs-keys` (see `vendor/VENDOR_INFO.md` for the pinned commit and rebuild steps).
+- Browser clients can't speak raw gRPC to a lightwalletd backend — `proxy/` is a self-hosted
+  Traefik instance (Traefik's native `grpcWeb` middleware) fronting the public
+  `testnet.zec.rocks` lightwalletd, deployed as its own Railway service since it's a
+  different runtime (Docker/Traefik) than the main Nixpacks-built Node app.
+- The WASM thread pool needs `Cross-Origin-Opener-Policy`/`Cross-Origin-Embedder-Policy`
+  headers, scoped narrowly in `src/server.ts` to just the migration-assistant page and its
+  assets so the rest of the API is unaffected.
+
+**Status:** feature-complete and verified for wallet generation, seed import/recovery (a
+re-imported seed deterministically recovers the same address), and live chain-tip lookups.
+The sync/send path is implemented against WebZjs's real API but **not yet verified against
+real funds** — both public testnet faucets were down at time of writing, so the final
+end-to-end gate (fund → sync → real send → confirm on-chain) is still open.
+
+### Superseded approach: residual attestation
+
+The original Phase 2 plan was a zero-knowledge proof letting holders prove control of a
+note in the sealed pool without spending it or revealing which note — tightening the
+residual into `unattested_residual`. Real work was done here: a genuine
 [halo2](https://github.com/zcash/halo2) circuit against real
-[`orchard`](https://github.com/zcash/orchard) primitives (audited fixed-base tables, real
-Sinsemilla/Poseidon hashing) — not a mock. **It is also unaudited and based on an
-unreviewed, unmerged spec.** See the [warning below](#️-phase-2--experimental--unaudited)
-before treating any of it as trustworthy.
+[`orchard`](https://github.com/zcash/orchard) primitives, not a mock (Stage A, the
+domain-separated alternate-nullifier primitive, complete with 5 tests; Stage B, single-note
+value-commitment integrity, partially done via `MockProver` with 4 tests). It was set aside
+— not because the cryptography failed, but because the underlying incentive was weak:
+proving ownership is strictly less useful than just moving the funds, which any wallet
+(including the migration assistant above) already lets you do.
 
-**Staged build-out, in order:**
+The code remains in `attestation/` and `POST /api/attest` is still live (honestly returning
+`valid: false, reason: "circuit not yet implemented (Stage B)"` for every submission, since
+Stages C/D were never finished) — kept for anyone curious about the approach, not as an
+active feature. It carries the same warning it always did:
 
-| Stage | What it is | Status |
-|---|---|---|
-| **A** | Off-circuit domain-separated "alternate nullifier" primitive (dedup without revealing the real nullifier) | ✅ Done, 5 tests |
-| **B** | Single-note circuit: value-commitment integrity against real `OrchardFixedBases` | 🟡 Partial — value commitment proven via `MockProver` in both directions (valid witness accepted; tampered value / tampered blinding factor / tampered public instance each independently rejected, 4 tests). Commitment-tree Merkle membership and spend-authority (RedDSA) proof are **not yet implemented**. No real prove/verify key round trip attempted yet — MockProver only. |
-| **C** | Wire the in-circuit alternate nullifier as a public output, cross-checked against Stage A's oracle, into `attestation.dedup_tag UNIQUE` | ⬜ Not started |
-| **D** | Nullifier non-membership/exclusion tree — the piece that would let an attestation prove a note is *still* unspent, not just that it existed at some anchor height | ⬜ Explicitly deferred |
-
-**Why Stage D is blocked, concretely — this is the thing actually slowing Phase 2 down
-right now:** proving non-membership requires the complete revealed-nullifier history from
-NU5 activation up to the attestation's anchor height. That means an **archive node with a
-full, from-genesis sync** — a hosted RPC gateway can't provide it, because the mechanism
-depends on having ingested and indexed *every* nullifier ever revealed, not just recent
-blocks. Tatum (the hosted provider Phase 1 uses for its live data) doesn't even expose the
-`z_gettreestate` RPC needed for anchor-fetching in the first place — confirmed by direct
-testing, not assumption — on any of its plan tiers. So Stage D's anchor/nullifier-history
-data can only come from a **self-run node with a complete sync**, and that node is
-currently still syncing from scratch in the background (independent of and behind the
-Tatum-backed data Phase 1 uses for its live numbers). Until that sync finishes, Stage D
-can't start, by design — an incomplete non-membership tree fails in the dangerous
-direction (a spent note could pass as unspent simply because its data was never ingested),
-so a partial/approximate version is deliberately not being attempted.
-
-**Node integration boundary (already built):** `POST /api/attest` invokes a compiled
-`turnstile-verifier` Rust binary via `child_process.spawn` (never a shell) — JSON in over
-stdin, JSON out over stdout, hard timeout with `SIGKILL`. A malformed or adversarial proof
-can only ever crash that subprocess, never the API server itself. Today the verifier
-honestly returns `valid: false, reason: "circuit not yet implemented (Stage B)"` for every
-submission — that's correct behavior, not a bug: no attestation can genuinely pass before
-the circuit exists.
-
-### ⚠️ Phase 2 — EXPERIMENTAL / UNAUDITED
-
-The `attestation/` workspace implements a zero-knowledge proof-of-balance circuit based on
-an **unreviewed, unmerged** draft ZIP
+**EXPERIMENTAL / UNAUDITED.** The circuit is based on an **unreviewed, unmerged** draft ZIP
 (<https://zips.z.cash/draft-str4d-orchard-balance-proof>, refined in
-[`zcash/zips` PR #1199](https://github.com/zcash/zips/pull/1199)). That PR has **zero
-approving reviews**, and its one active reviewer dismissed their own review in March 2026,
+[`zcash/zips` PR #1199](https://github.com/zcash/zips/pull/1199)), which has **zero
+approving reviews** — its one active reviewer dismissed their own review in March 2026,
 writing: "I'm unable to continue reviewing this, so dismissing my review to ensure it
 doesn't block merging." There is no external cryptographic audit of anything in this
-repository.
-
-Do not treat any output of `attestation/` as cryptographically sound without independent
-review. See `attestation/SECURITY.md` for the exact trust boundary and dependency policy
-(including the explicit policy against two suspiciously-on-topic crates from an unverified
-publisher, found and deliberately rejected during Phase 2 research).
+repository. See `attestation/SECURITY.md` for the full trust-boundary and dependency
+policy.
 
 ## Running it locally
 
@@ -170,13 +175,20 @@ functions.
 
 ## Deployment
 
-Deployed on [Railway](https://railway.app): one service running both processes (the
-indexer self-restarts on crash via `scripts/railway-start.sh`; the server is the container's
-foreground process), backed by a persistent volume for the SQLite file. `railway.json`
-holds the build/deploy config.
+The main app is deployed on [Railway](https://railway.app): one service running both
+processes (the indexer self-restarts on crash via `scripts/railway-start.sh`; the server is
+the container's foreground process), backed by a persistent volume for the SQLite file.
+`railway.json` holds the build/deploy config (Nixpacks).
+
+The migration assistant's Traefik gRPC-web proxy (`proxy/Dockerfile`) is built and verified
+working locally (real grpc-web round trip confirmed against `testnet.zec.rocks`), but
+**not yet deployed** as its own Railway service — until it is, the production
+`migrate.html` has no working proxy to point at.
 
 ## Tech stack
 
 TypeScript / Node.js (`node:sqlite`, Express), Rust (`halo2_gadgets`, `halo2_proofs`,
-`orchard`) for the Phase 2 circuit, hand-rolled SVG + GSAP for the dashboard — no charting
-library, no ORM, no framework beyond Express.
+`orchard`) for the superseded attestation circuit, hand-rolled SVG + GSAP for the dashboard
+— no charting library, no ORM, no framework beyond Express. The migration assistant adds:
+WebZjs (Zcash Rust crypto compiled to WASM via `wasm-pack`, vendored from source), and
+Traefik (self-hosted gRPC-web proxy, deployed as a separate Railway service).

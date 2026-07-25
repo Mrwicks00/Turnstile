@@ -11,8 +11,8 @@ log:
 
 entryPoints:
   web:
-    address: :80
+    address: 127.0.0.1:8081
 
 providers:
   file:
-    directory: /etc/traefik/
+    directory: ./proxy

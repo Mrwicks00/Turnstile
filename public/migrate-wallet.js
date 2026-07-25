@@ -23,7 +23,14 @@ function findAccountBalance(accountBalances, id) {
 
 function spendableZats(balanceEntry) {
   if (!balanceEntry) return 0;
-  return (balanceEntry.sapling_balance || 0) + (balanceEntry.orchard_balance || 0);
+  return (balanceEntry.sapling_balance || 0) + (balanceEntry.orchard_balance || 0) + (balanceEntry.unshielded_balance || 0);
+}
+
+function describeBalance(balanceEntry) {
+  if (!balanceEntry) return "no account balance entry found";
+  return `sapling=${balanceEntry.sapling_balance || 0} orchard=${balanceEntry.orchard_balance || 0} ` +
+    `transparent=${balanceEntry.unshielded_balance || 0} pending_change=${balanceEntry.pending_change || 0} ` +
+    `pending_spendable=${balanceEntry.pending_spendable || 0}`;
 }
 
 function log(msg) {
@@ -215,7 +222,8 @@ document.getElementById("btn-sync").addEventListener("click", async () => {
     if (zec > 0) {
       document.getElementById("wallet-actions-send").style.display = "flex";
     }
-    log("sync complete, balance=" + zec + " TAZ");
+    log("sync complete, balance=" + zec + " TAZ (" + describeBalance(balanceEntry) + ")");
+    log("wallet summary: chain_tip=" + summary.chain_tip_height + " fully_scanned=" + summary.fully_scanned_height + " accounts=" + JSON.stringify(summary.account_balances.map(([id]) => id)));
     setBusy("btn-sync", false, "Check balance");
   } catch (err) {
     log("ERROR: " + (err && err.message ? err.message : String(err)));
