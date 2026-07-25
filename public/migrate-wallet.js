@@ -11,6 +11,7 @@ let wallet = null;
 let accountId = null;
 let seedPhrase = null;
 let currentTip = null;
+let lastKnownZats = 0;
 
 // WalletSummary.account_balances serializes (via serde_wasm_bindgen, see WebZjs's
 // crates/webzjs-wallet/src/bindgen/wallet.rs) as an array of [accountId, AccountBalance]
@@ -213,6 +214,7 @@ document.getElementById("btn-sync").addEventListener("click", async () => {
     const balanceEntry = summary ? findAccountBalance(summary.account_balances, accountId) : null;
     const zats = spendableZats(balanceEntry);
     const zec = zats / 1e8;
+    lastKnownZats = zats;
 
     document.getElementById("wallet-balance").innerHTML = `
       <div class="status" style="margin-top:1rem;">
@@ -221,6 +223,12 @@ document.getElementById("btn-sync").addEventListener("click", async () => {
 
     if (zec > 0) {
       document.getElementById("wallet-actions-send").style.display = "flex";
+      const amountInput = document.getElementById("send-amount");
+      const suggested = Math.min(zats / 2, 100000000) / 1e8; // default to half balance, capped at 1 ZEC
+      amountInput.value = suggested.toFixed(8);
+      amountInput.max = String(zec);
+      document.getElementById("send-amount-hint").textContent =
+        `Balance is ${zec.toLocaleString(undefined, { maximumFractionDigits: 8 })} TAZ - leave some unspent to cover the network fee.`;
     }
     log("sync complete, balance=" + zec + " TAZ (" + describeBalance(balanceEntry) + ")");
     log("wallet summary: chain_tip=" + summary.chain_tip_height + " fully_scanned=" + summary.fully_scanned_height + " accounts=" + JSON.stringify(summary.account_balances.map(([id]) => id)));
@@ -241,12 +249,15 @@ document.getElementById("btn-send").addEventListener("click", async () => {
     const summary = await wallet.get_wallet_summary();
     const balanceEntry = findAccountBalance(summary.account_balances, accountId);
     const zats = spendableZats(balanceEntry);
-    // Real ZIP-317 fees can exceed a small guessed buffer (propose_transfer failed with
-    // "possibly insufficient balance" trying to send balance-minus-10000zats) - send at
-    // most half the balance (capped at 1 ZEC) instead of nearly everything, leaving real
-    // margin for whatever the actual fee turns out to be.
-    const sendAmount = BigInt(Math.min(Math.floor(zats / 2), 100000000));
-    log(`sending ${Number(sendAmount) / 1e8} ZEC of ${zats / 1e8} ZEC balance (leaving margin for fees)`);
+
+    const requestedZec = parseFloat(document.getElementById("send-amount").value);
+    if (!(requestedZec > 0)) throw new Error("enter an amount greater than 0");
+    const sendAmount = BigInt(Math.round(requestedZec * 1e8));
+    if (sendAmount >= BigInt(zats)) {
+      throw new Error(`that's your whole balance - real network fees need some left over. ` +
+        `Try something less than ${(zats / 1e8).toFixed(8)} TAZ.`);
+    }
+    log(`sending ${requestedZec} ZEC of ${zats / 1e8} ZEC balance`);
 
     const proposal = await wallet.propose_transfer(accountId, destAddress, sendAmount);
     log("proposal created");
