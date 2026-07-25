@@ -4,3 +4,4 @@ data/
 .env
 attestation/target/
 .claude/
+migration-assistant/

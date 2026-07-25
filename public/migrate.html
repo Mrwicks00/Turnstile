@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Turnstile — Migration Assistant</title>
+
+<style>
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --vellum: #F5EFE1;
+  --slate: #16302C;
+  --teal-deep: #146B62;
+  --teal: #2F9C90;
+  --rust: #C1502E;
+  --pewter: #7C8A80;
+  --hairline: rgba(22, 48, 44, 0.16);
+  --surface: var(--vellum);
+  --ink-text: var(--slate);
+  --ink-text-muted: #52655F;
+  --accent-water: var(--teal-deep);
+  --accent-signature: var(--rust);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #0E2321;
+    --ink-text: #EDE3C8;
+    --ink-text-muted: #9FB0A9;
+    --accent-water: var(--teal);
+    --accent-signature: var(--rust);
+    --hairline: rgba(237, 227, 200, 0.14);
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #0E2321;
+  --ink-text: #EDE3C8;
+  --ink-text-muted: #9FB0A9;
+  --accent-water: var(--teal);
+  --accent-signature: var(--rust);
+  --hairline: rgba(237, 227, 200, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink-text);
+  font-family: "Inter", -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.mono { font-family: "Space Mono", ui-monospace, monospace; }
+
+/* ---- Masthead ---- */
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+.masthead__left { display: flex; align-items: center; gap: 0.75rem; }
+.masthead__mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--accent-water);
+}
+.masthead__text {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+.masthead__text b { color: var(--ink-text); font-weight: 700; }
+.masthead__nav {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-water);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.masthead__nav:hover { text-decoration: underline; }
+
+/* ---- Page header ---- */
+.page-title {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+.page-lede {
+  color: var(--ink-text-muted);
+  font-size: 0.95rem;
+  max-width: 56ch;
+  margin: 0 0 2rem;
+}
+
+/* ---- Info banner (not a warning — a scope boundary) ---- */
+.scope-banner {
+  border: 1px solid var(--accent-water);
+  border-radius: 4px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 2.5rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.scope-banner__label {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-water);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- Section title ---- */
+.section-title {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+  margin-bottom: 1rem;
+}
+.section { margin-bottom: 2.75rem; }
+
+/* ---- Step flow ---- */
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+.step {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.step:last-child { border-bottom: none; }
+.step__num {
+  counter-increment: step;
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--accent-water);
+  color: var(--accent-water);
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step__num::before { content: counter(step); }
+.step__body h3 {
+  margin: 0.05rem 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.step__body p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-text-muted);
+}
+.step__body code {
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  background: var(--hairline);
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+}
+
+/* ---- Status panel ---- */
+.status { border-top: 1px solid var(--hairline); }
+.status__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.status__label {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+.status__value {
+  font-family: "Space Mono", monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink-text);
+  text-align: right;
+}
+.status__note {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-text-muted);
+}
+.badge {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15em 0.5em;
+  border-radius: 2px;
+  border: 1px solid var(--pewter);
+  color: var(--pewter);
+}
+.badge--active { border-color: var(--accent-water); color: var(--accent-water); }
+
+/* ---- Address box ---- */
+.address-box {
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  font-size: 0.78rem;
+  word-break: break-all;
+  color: var(--ink-text-muted);
+  margin-top: 1rem;
+}
+
+/* ---- Danger variant of scope-banner: real key material, real risk ---- */
+.scope-banner--danger {
+  border-color: var(--accent-signature);
+}
+.scope-banner--danger .scope-banner__label {
+  color: var(--accent-signature);
+}
+
+/* ---- Try-it-yourself wallet ---- */
+.wallet-box {
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 1.1rem 1.2rem;
+  margin-top: 1.5rem;
+}
+.wallet-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+.wallet-btn {
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vellum);
+  background: var(--accent-water);
+  border: none;
+  border-radius: 3px;
+  padding: 0.75rem 1.2rem;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+.wallet-btn:hover { opacity: 0.88; }
+.wallet-btn:active { transform: scale(0.98); }
+.wallet-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.seed-box {
+  border: 1px solid var(--accent-signature);
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  margin-top: 1rem;
+  font-size: 0.82rem;
+  word-break: break-word;
+  color: var(--ink-text);
+}
+.wallet-log {
+  margin-top: 1rem;
+  font-size: 0.82rem;
+  color: var(--ink-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.copy-btn {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-water);
+  background: none;
+  border: 1px solid var(--accent-water);
+  border-radius: 3px;
+  padding: 0.3em 0.6em;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <div class="masthead__left">
+      <svg class="masthead__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="10.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M14 4 L14 14 L21 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="masthead__text"><b>Turnstile</b> — Ironwood (NU6.3) drain monitor</div>
+    </div>
+    <a class="masthead__nav" href="/">← drain monitor</a>
+  </div>
+
+  <h1 class="page-title">Migration assistant</h1>
+  <p class="page-lede">The residual figure on the drain monitor isn't abstract — it's real testnet ZEC sitting in wallets that haven't moved it out of the sealed Orchard pool yet. This page runs an actual migration, end to end, using Zcash's own wallet software — so you can watch what closing that gap really looks like.</p>
+
+  <div class="scope-banner">
+    <span class="scope-banner__label">What this is, and isn't</span>
+    This is a real testnet transaction, run with a wallet <strong>we</strong> control, funded from a
+    public faucet — not a tool that touches your funds or asks for your keys. A safe migration
+    of your own ZEC has to happen in your own wallet, with your own keys, which this project will
+    never request. What follows is a transparent demo of the exact steps that requires, run
+    honestly in the open rather than described in the abstract.
+  </div>
+
+  <div class="section">
+    <div class="section-title">How a migration actually works</div>
+    <ul class="steps">
+      <li class="step">
+        <span class="step__num"></span>
+        <div class="step__body">
+          <h3>Get a wallet that speaks the current spend rules</h3>
+          <p><code>zcashd</code>'s built-in wallet reached end-of-support in July 2026. The
+          replacement is <a href="https://github.com/zcash/zallet" target="_blank" rel="noopener">Zallet</a>,
+          Zcash's new standalone wallet — the one this demo uses, talking to our own
+          synced <code>zebrad</code> node.</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step__num"></span>
+        <div class="step__body">
+          <h3>Check what's sitting in the pool</h3>
+          <p>The wallet reports its Orchard balance directly from the chain — no separate
+          attestation step needed. If the balance is nonzero, it's movable.</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step__num"></span>
+        <div class="step__body">
+          <h3>Send it to a fresh address</h3>
+          <p>A normal shielded send — the same operation as spending — using
+          <code>z_sendmany</code>. This is the whole "migration": there's no special
+          instruction for it, because moving a note has always been the way out.</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step__num"></span>
+        <div class="step__body">
+          <h3>Confirm on chain</h3>
+          <p>Once mined, the transaction is visible like any other — and it should show up
+          as a real balance change in this project's own independent indexer, the same one
+          powering the drain monitor.</p>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Try it yourself — a real testnet wallet, in this page</div>
+
+    <div class="scope-banner scope-banner--danger">
+      <span class="scope-banner__label">Testnet only. Client-side only. We never see this.</span>
+      Clicking below generates a real 24-word seed phrase and a real shielded wallet, entirely
+      in your browser — nothing is ever sent to our server. Closing or refreshing this tab loses
+      access to it; nothing is saved anywhere by us, so the only way back in is pasting your own
+      saved seed phrase into "Import" below. This uses <a href="https://github.com/ChainSafe/WebZjs" target="_blank" rel="noopener">WebZjs</a>,
+      an unaudited, in-development library ("no reviews or audit, and come with no guarantees
+      whatsoever," per its own docs) built on Zcash's official cryptography. <strong>Never paste
+      in a real seed phrase, or one protecting real funds, on this or any page.</strong>
+    </div>
+
+    <div class="wallet-box" id="wallet-box">
+      <div class="wallet-actions">
+        <button class="wallet-btn" id="btn-generate">Generate testnet wallet</button>
+        <button class="wallet-btn" id="btn-show-import" style="background:transparent;color:var(--accent-water);border:1px solid var(--accent-water);">Import existing seed phrase</button>
+      </div>
+      <div id="import-form" style="display:none; margin-top:1rem;">
+        <div class="form-row">
+          <label for="import-seed" style="display:block; font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-text-muted); margin-bottom:0.4rem;">Seed phrase (24 words)</label>
+          <textarea id="import-seed" rows="2" style="width:100%; background:transparent; border:1px solid var(--hairline); border-radius:3px; padding:0.65rem 0.75rem; font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--ink-text);"></textarea>
+        </div>
+        <div class="form-row" style="margin-top:0.75rem;">
+          <label for="import-birthday" style="display:block; font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-text-muted); margin-bottom:0.4rem;">Birthday height (block height when you first generated this wallet — leave blank if unsure)</label>
+          <input type="number" id="import-birthday" placeholder="e.g. 4200352" style="width:100%; background:transparent; border:1px solid var(--hairline); border-radius:3px; padding:0.65rem 0.75rem; font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--ink-text);" />
+          <p class="status__note">If your funds were received before this height, sync won't find them — when in doubt, use a lower number. Leaving this blank scans from a recent default, not from genesis.</p>
+        </div>
+        <div class="wallet-actions">
+          <button class="wallet-btn" id="btn-import">Import wallet</button>
+        </div>
+      </div>
+      <div id="wallet-seed"></div>
+      <div id="wallet-address"></div>
+      <div class="wallet-actions" id="wallet-actions-sync" style="display:none;">
+        <button class="wallet-btn" id="btn-sync">Check balance</button>
+      </div>
+      <div id="wallet-balance"></div>
+      <div class="wallet-actions" id="wallet-actions-send" style="display:none;">
+        <button class="wallet-btn" id="btn-send">Send test migration</button>
+      </div>
+      <div id="wallet-result"></div>
+      <div class="wallet-log" id="wallet-log"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Our own reference demo <span class="status__note" style="display:inline;margin:0;">— as of 2026-07-25</span></div>
+    <div class="status" id="status-panel">
+      <div class="status__row">
+        <span class="status__label">Our reference node</span>
+        <span class="status__value">syncing toward Orchard</span>
+      </div>
+      <div class="status__row">
+        <span class="status__label">Needs to reach (NU5 activation)</span>
+        <span class="status__value">1,842,420</span>
+      </div>
+      <div class="status__row">
+        <span class="status__label">Status</span>
+        <span class="status__value"><span class="badge">staged, not yet migrated</span></span>
+      </div>
+    </div>
+    <p class="status__note">This is a manually-checked snapshot, not a live poll — our demo
+      wallet runs on infrastructure this public page can't query directly. Funds are already
+      staged in the wallet from the testnet faucet; the actual Orchard→Sapling migration
+      transaction runs once our own node finishes syncing to Orchard activation. We'll replace
+      this panel with the real transaction id once that happens.</p>
+    <div class="address-box mono">Demo wallet: Zallet v0.1.0-beta.1, connected to a project-run
+      Zebra testnet node · no user funds or keys involved.</div>
+  </div>
+</div>
+
+<script src="/gsap.min.js"></script>
+<script type="module" src="/migrate-wallet.js"></script>
+<script>
+if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  gsap.from(".page-title, .page-lede", { autoAlpha: 0, y: 10, duration: 0.5, stagger: 0.08 });
+  gsap.from(".scope-banner", { autoAlpha: 0, y: 10, duration: 0.5, stagger: 0.1, delay: 0.15 });
+  gsap.from(".step", { autoAlpha: 0, y: 10, duration: 0.4, stagger: 0.08, delay: 0.3 });
+  gsap.from(".wallet-box", { autoAlpha: 0, y: 10, duration: 0.4, delay: 0.6 });
+  gsap.from(".status__row", { autoAlpha: 0, x: -10, duration: 0.35, stagger: 0.06, delay: 0.8 });
+}
+</script>
+</body>
+</html>

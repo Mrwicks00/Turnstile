@@ -94,9 +94,20 @@ body {
 .masthead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 3.5rem;
 }
+.masthead__left { display: flex; align-items: center; gap: 0.75rem; }
+.masthead__nav {
+  font-family: "Space Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-water);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.masthead__nav:hover { text-decoration: underline; }
 .masthead__mark {
   width: 28px;
   height: 28px;
@@ -251,11 +262,14 @@ body {
 <body>
 <div class="wrap">
   <div class="masthead">
-    <svg class="masthead__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="10.5" stroke="currentColor" stroke-width="1.4"/>
-      <path d="M14 4 L14 14 L21 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <div class="masthead__text"><b>Turnstile</b> — Ironwood (NU6.3) drain monitor</div>
+    <div class="masthead__left">
+      <svg class="masthead__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="10.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M14 4 L14 14 L21 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="masthead__text"><b>Turnstile</b> — Ironwood (NU6.3) drain monitor</div>
+    </div>
+    <a class="masthead__nav" href="/migrate.html">Migration assistant →</a>
   </div>
 
   <div id="content">
@@ -298,19 +312,25 @@ function buildChartSvg(series) {
   const heights = series.map((p) => p.height);
   const balances = series.map((p) => p.orchard_balance / 1e8);
   const minH = Math.min(...heights), maxH = Math.max(...heights);
-  const minB = Math.min(0, ...balances), maxB = Math.max(...balances, minB + 1e-8);
+  const dataMinB = Math.min(...balances), dataMaxB = Math.max(...balances, dataMinB + 1e-8);
+  // Zoom to the observed range rather than forcing a zero baseline: the total pool size is
+  // already shown elsewhere (the residual figure/gauge), so this chart's job is to make the
+  // trend visible - anchoring to zero pins a small drain to a near-flat line right on top of
+  // the axis label. 10% headroom keeps the line clear of both axis labels.
+  const headroom = (dataMaxB - dataMinB) * 0.1 || Math.max(dataMaxB, 1) * 0.02;
+  const scaleMinB = dataMinB - headroom, scaleMaxB = dataMaxB + headroom;
   const x = (hh) => padL + (maxH === minH ? 0 : ((hh - minH) / (maxH - minH)) * plotW);
-  const y = (b) => padT + plotH - ((b - minB) / (maxB - minB)) * plotH;
+  const y = (b) => padT + plotH - ((b - scaleMinB) / (scaleMaxB - scaleMinB)) * plotH;
 
   const linePoints = series.map((p) => `${x(p.height)},${y(p.orchard_balance / 1e8)}`).join(" L ");
-  const areaPath = `M ${x(series[0].height)},${y(0)} L ${linePoints.replace(/^/, "")} L ${x(series[series.length-1].height)},${y(0)} Z`;
+  const areaPath = `M ${x(series[0].height)},${y(scaleMinB)} L ${linePoints.replace(/^/, "")} L ${x(series[series.length-1].height)},${y(scaleMinB)} Z`;
   const linePath = `M ${linePoints}`;
 
   return {
     svg: `
       <svg viewBox="0 0 ${w} ${h}" id="chart-svg">
-        <text class="chart-axis-label" x="${padL}" y="${padT + 4}" text-anchor="start">${maxB.toFixed(4)}</text>
-        <text class="chart-axis-label" x="${padL}" y="${padT + plotH}" text-anchor="start">${minB.toFixed(4)}</text>
+        <text class="chart-axis-label" x="${padL}" y="${padT + 4}" text-anchor="start">${dataMaxB.toFixed(4)}</text>
+        <text class="chart-axis-label" x="${padL}" y="${padT + plotH}" text-anchor="start">${dataMinB.toFixed(4)}</text>
         <text class="chart-axis-label" x="${padL}" y="${h - 4}" text-anchor="start">${minH}</text>
         <text class="chart-axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${maxH}</text>
         <path class="chart-area" d="${areaPath}"/>

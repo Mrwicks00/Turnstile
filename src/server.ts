@@ -58,6 +58,30 @@ export function buildApp(
     res.json(result);
   });
 
+  // COOP/COEP are required for WebZjs's WASM thread pool (SharedArrayBuffer) on
+  // migrate.html - scoped narrowly so the JSON /api/* routes and index.html are unaffected.
+  const WEBZJS_ENTRY_POINT: Record<string, string> = {
+    "/vendor/webzjs-wallet": "/vendor/webzjs-wallet/webzjs_wallet.js",
+    "/vendor/webzjs-wallet/": "/vendor/webzjs-wallet/webzjs_wallet.js",
+    "/vendor/webzjs-keys": "/vendor/webzjs-keys/webzjs_keys.js",
+    "/vendor/webzjs-keys/": "/vendor/webzjs-keys/webzjs_keys.js",
+  };
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    // wasm-bindgen-rayon's generated worker helper does `import('../../..')` - a bare
+    // package-root import that only resolves via a bundler's package.json main-field
+    // lookup, not in a native browser ESM load - so rewrite it to the real entry file.
+    const rewrite = WEBZJS_ENTRY_POINT[req.path];
+    if (rewrite) req.url = rewrite;
+    next();
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === "/migrate.html" || req.path === "/migrate-wallet.js" || req.path.startsWith("/vendor/webzjs")) {
+      res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+      res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    }
+    next();
+  });
+
   app.use(express.static(join(__dirname, "..", "public")));
 
   app.use((_req: Request, res: Response) => {
